@@ -2,7 +2,7 @@
   "name": "git-nova",
   "displayName": "GitNova",
   "description": "Visualise and manage your Git workflow with a rhythm. The heartbeat of your codebase.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "sitharaj",
   "repository": {
     "type": "git",
@@ -211,6 +211,67 @@
         "category": "GitNova"
       },
       {
+        "command": "gitNova.stash.apply",
+        "title": "GitNova: Apply Stash",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.stash.pop",
+        "title": "GitNova: Pop Stash",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.stash.drop",
+        "title": "GitNova: Drop Stash",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.stash.list",
+        "title": "GitNova: List Stashes",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.stash.clear",
+        "title": "GitNova: Clear Stashes",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.stash.context.apply",
+        "title": "Apply Stash",
+        "category": "GitNova",
+        "icon": "$(check)"
+      },
+      {
+        "command": "gitNova.stash.context.pop",
+        "title": "Pop Stash",
+        "category": "GitNova",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "gitNova.stash.context.drop",
+        "title": "Drop Stash",
+        "category": "GitNova",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gitNova.stash.context.showDetails",
+        "title": "Show Stash Details",
+        "category": "GitNova",
+        "icon": "$(info)"
+      },
+      {
+        "command": "gitNova.stash.context.create",
+        "title": "Create Stash",
+        "category": "GitNova",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gitNova.stash.context.clear",
+        "title": "Clear All Stashes",
+        "category": "GitNova",
+        "icon": "$(close-all)"
+      },
+      {
         "command": "gitNova.rebase.start",
         "title": "GitNova: Start Rebase",
         "category": "GitNova"
@@ -282,6 +343,12 @@
         "title": "Discard Changes",
         "category": "GitNova",
         "icon": "$(discard)"
+      },
+      {
+        "command": "gitNova.discardAllChanges",
+        "title": "Discard All Changes",
+        "category": "GitNova",
+        "icon": "$(trash)"
       },
       {
         "command": "gitNova.openFileDiff",
@@ -452,6 +519,11 @@
           "group": "navigation@3"
         },
         {
+          "command": "gitNova.discardAllChanges",
+          "when": "view == gitNova.changes",
+          "group": "navigation@4"
+        },
+        {
           "command": "gitNova.changes.refresh",
           "when": "view == gitNova.changes",
           "group": "navigation@4"
@@ -500,6 +572,11 @@
           "command": "gitNova.stash.create",
           "when": "view == gitNova.stashes",
           "group": "navigation@2"
+        },
+        {
+          "command": "gitNova.stash.clear",
+          "when": "view == gitNova.stashes",
+          "group": "navigation@3"
         },
         {
           "command": "gitNova.refresh",
@@ -637,6 +714,36 @@
           "command": "gitNova.tags.push",
           "when": "view == gitNova.tags && viewItem == tag",
           "group": "1_tagActions@2"
+        },
+        {
+          "command": "gitNova.stash.context.apply",
+          "when": "view == gitNova.stashes && viewItem == stash",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitNova.stash.context.pop",
+          "when": "view == gitNova.stashes && viewItem == stash",
+          "group": "inline@2"
+        },
+        {
+          "command": "gitNova.stash.context.drop",
+          "when": "view == gitNova.stashes && viewItem == stash",
+          "group": "inline@3"
+        },
+        {
+          "command": "gitNova.stash.context.showDetails",
+          "when": "view == gitNova.stashes && viewItem == stash",
+          "group": "more@1"
+        },
+        {
+          "command": "gitNova.stash.context.create",
+          "when": "view == gitNova.stashes && viewItem == root",
+          "group": "actions@1"
+        },
+        {
+          "command": "gitNova.stash.context.clear",
+          "when": "view == gitNova.stashes && viewItem == root",
+          "group": "actions@2"
         }
       ]
     },

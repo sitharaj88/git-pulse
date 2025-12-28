@@ -2,8 +2,18 @@
 
 All notable changes to the "GitNova" extension will be documented in this file.
 
+## [1.0.3] - 2025-12-28
+- Faster stage/unstage updates in CHANGES via optimistic status cache and debounced refreshes.
+- Discard fixes: handle untracked files, add discard-all action, and refresh status immediately.
+- Status bar now reflects branch switches and dirty state more reliably.
+- Stash context menus support apply/pop/drop/details with cache invalidation.
+- Align command IDs and contributions to avoid activation errors.
+
 ## [1.0.2] - 2025-12-28
 - Optimized icon sizes to VS Code extension standards (128x128).
+
+## [1.0.3] - 2025-12-28
+- Updated: Application icon is now a full square to prevent cutoff.
 
 ## [1.0.1] - 2025-12-28
 - Fixed: Application icon now has transparent corners.
