@@ -1,0 +1,779 @@
+{
+  "name": "git-nova",
+  "displayName": "GitNova",
+  "description": "Visualise and manage your Git workflow with a rhythm. The heartbeat of your codebase.",
+  "version": "1.0.0",
+  "publisher": "sitharaj",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sitharaj88/git-nova.git"
+  },
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/sitharaj88/git-nova/issues"
+  },
+  "homepage": "https://github.com/sitharaj88/git-nova#readme",
+  "engines": {
+    "vscode": "^1.107.0"
+  },
+  "categories": [
+    "SCM Providers"
+  ],
+  "keywords": [
+    "git",
+    "version control",
+    "branch",
+    "commit",
+    "merge",
+    "rebase",
+    "stash",
+    "diff"
+  ],
+  "activationEvents": [
+    "onLanguage:git-commit",
+    "onLanguage:git-rebase",
+    "onLanguage:diff",
+    "onCommand:gitNova.init",
+    "onCommand:gitNova.clone",
+    "onView:gitNova.sourceControl",
+    "onView:gitNova.changes",
+    "onView:gitNova.branches",
+    "onView:gitNova.commits",
+    "onView:gitNova.stashes",
+    "onView:gitNova.remotes",
+    "onView:gitNova.tags",
+    "workspaceContains:.git"
+  ],
+  "main": "./out/extension.js",
+  "icon": "resources/icons/logo.png",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "git-nova-container",
+          "title": "GitNova",
+          "icon": "resources/icons/activity-bar.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitNova.branch.create",
+        "title": "GitNova: Create Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.delete",
+        "title": "GitNova: Delete Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.switch",
+        "title": "GitNova: Switch Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.rename",
+        "title": "GitNova: Rename Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.checkout",
+        "title": "GitNova: Checkout",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.merge",
+        "title": "GitNova: Merge Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.compare",
+        "title": "GitNova: Compare Branches",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.fetch",
+        "title": "GitNova: Fetch Branches",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.push",
+        "title": "GitNova: Push Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.pull",
+        "title": "GitNova: Pull Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.track",
+        "title": "GitNova: Track Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.untrack",
+        "title": "GitNova: Untrack Branch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.branch.context.switch",
+        "title": "Switch to Branch",
+        "category": "GitNova",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "gitNova.branch.context.create",
+        "title": "Create New Branch",
+        "category": "GitNova",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gitNova.branch.context.delete",
+        "title": "Delete Branch",
+        "category": "GitNova",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gitNova.branch.context.rename",
+        "title": "Rename Branch",
+        "category": "GitNova",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "gitNova.branch.context.merge",
+        "title": "Merge Branch",
+        "category": "GitNova",
+        "icon": "$(merge)"
+      },
+      {
+        "command": "gitNova.branch.context.compare",
+        "title": "Compare Branches",
+        "category": "GitNova",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "gitNova.branch.context.push",
+        "title": "Push Branch",
+        "category": "GitNova",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "gitNova.branch.context.pull",
+        "title": "Pull Branch",
+        "category": "GitNova",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "gitNova.branch.context.track",
+        "title": "Set Tracking Branch",
+        "category": "GitNova",
+        "icon": "$(link)"
+      },
+      {
+        "command": "gitNova.branch.context.untrack",
+        "title": "Untrack Branch",
+        "category": "GitNova",
+        "icon": "$(unlink)"
+      },
+      {
+        "command": "gitNova.branch.context.fetch",
+        "title": "Fetch Remote Branches",
+        "category": "GitNova",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gitNova.branch.context.refresh",
+        "title": "Refresh",
+        "category": "GitNova",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitNova.commit.create",
+        "title": "GitNova: Create Commit",
+        "category": "GitNova",
+        "icon": "$(check)"
+      },
+      {
+        "command": "gitNova.commit.viewHistory",
+        "title": "GitNova: View Commit History",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.diff.viewFile",
+        "title": "GitNova: View File Diff",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.stash.create",
+        "title": "GitNova: Create Stash",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.rebase.start",
+        "title": "GitNova: Start Rebase",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.merge.start",
+        "title": "GitNova: Start Merge",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.remote.fetch",
+        "title": "GitNova: Fetch",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.remote.pull",
+        "title": "GitNova: Pull",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.remote.push",
+        "title": "GitNova: Push",
+        "category": "GitNova"
+      },
+      {
+        "command": "gitNova.init",
+        "title": "GitNova: Initialize Repository",
+        "category": "GitNova",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gitNova.clone",
+        "title": "GitNova: Clone Repository",
+        "category": "GitNova",
+        "icon": "$(repo-clone)"
+      },
+      {
+        "command": "gitNova.refresh",
+        "title": "GitNova: Refresh All",
+        "category": "GitNova",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitNova.stageFile",
+        "title": "Stage File",
+        "category": "GitNova",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gitNova.unstageFile",
+        "title": "Unstage File",
+        "category": "GitNova",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "gitNova.stageAll",
+        "title": "Stage All Changes",
+        "category": "GitNova",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "gitNova.unstageAll",
+        "title": "Unstage All Changes",
+        "category": "GitNova",
+        "icon": "$(close-all)"
+      },
+      {
+        "command": "gitNova.discardChanges",
+        "title": "Discard Changes",
+        "category": "GitNova",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "gitNova.openFileDiff",
+        "title": "View Diff",
+        "category": "GitNova",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "gitNova.openFile",
+        "title": "Open File",
+        "category": "GitNova",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "gitNova.revealInExplorer",
+        "title": "Reveal in Finder",
+        "category": "GitNova",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "gitNova.copyPath",
+        "title": "Copy Path",
+        "category": "GitNova",
+        "icon": "$(files)"
+      },
+      {
+        "command": "gitNova.copyRelativePath",
+        "title": "Copy Relative Path",
+        "category": "GitNova",
+        "icon": "$(file-symlink-file)"
+      },
+      {
+        "command": "gitNova.openGitGraph",
+        "title": "GitNova: Open Git Graph",
+        "category": "GitNova",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "gitNova.tags.create",
+        "title": "Create Tag",
+        "category": "GitNova",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gitNova.tags.delete",
+        "title": "Delete Tag",
+        "category": "GitNova",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gitNova.tags.checkout",
+        "title": "Checkout Tag",
+        "category": "GitNova",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "gitNova.tags.push",
+        "title": "Push Tag",
+        "category": "GitNova",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "gitNova.changes.refresh",
+        "title": "Refresh Changes",
+        "category": "GitNova",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitNova.sourceControl.sync",
+        "title": "Sync",
+        "category": "GitNova",
+        "icon": "$(sync)"
+      }
+    ],
+    "views": {
+      "git-nova-container": [
+        {
+          "id": "gitNova.sourceControl",
+          "name": "Source Control",
+          "icon": "$(source-control)",
+          "contextualTitle": "GitNova"
+        },
+        {
+          "id": "gitNova.changes",
+          "name": "Changes",
+          "icon": "$(diff)",
+          "contextualTitle": "GitNova"
+        },
+        {
+          "id": "gitNova.branches",
+          "name": "Branches",
+          "icon": "$(git-branch)",
+          "contextualTitle": "GitNova"
+        },
+        {
+          "id": "gitNova.commits",
+          "name": "Commit History",
+          "icon": "$(history)",
+          "contextualTitle": "GitNova"
+        },
+        {
+          "id": "gitNova.stashes",
+          "name": "Stashes",
+          "icon": "$(archive)",
+          "contextualTitle": "GitNova"
+        },
+        {
+          "id": "gitNova.remotes",
+          "name": "Remotes",
+          "icon": "$(cloud)",
+          "contextualTitle": "GitNova"
+        },
+        {
+          "id": "gitNova.tags",
+          "name": "Tags",
+          "icon": "$(tag)",
+          "contextualTitle": "GitNova"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "gitNova.sourceControl",
+        "contents": "No Git repository detected in the current workspace.\n[Initialize Repository](command:gitNova.init)\n[Clone Repository](command:gitNova.clone)\n\nLearn more about [Git](https://git-scm.com/doc).",
+        "when": "!gitNova.hasRepository"
+      },
+      {
+        "view": "gitNova.changes",
+        "contents": "No changes detected.\nAll files are up to date.\n[Refresh](command:gitNova.refresh)",
+        "when": "gitNova.hasRepository && gitNova.noChanges"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitNova.sourceControl.sync",
+          "when": "view == gitNova.sourceControl",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitNova.refresh",
+          "when": "view == gitNova.sourceControl",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitNova.openGitGraph",
+          "when": "view == gitNova.sourceControl",
+          "group": "navigation@3"
+        },
+        {
+          "command": "gitNova.commit.create",
+          "when": "view == gitNova.changes",
+          "group": "navigation@0"
+        },
+        {
+          "command": "gitNova.remote.push",
+          "when": "view == gitNova.changes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitNova.stageAll",
+          "when": "view == gitNova.changes",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitNova.unstageAll",
+          "when": "view == gitNova.changes",
+          "group": "navigation@3"
+        },
+        {
+          "command": "gitNova.changes.refresh",
+          "when": "view == gitNova.changes",
+          "group": "navigation@4"
+        },
+        {
+          "command": "gitNova.branch.context.create",
+          "when": "view == gitNova.branches",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitNova.branch.context.refresh",
+          "when": "view == gitNova.branches",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitNova.branch.context.fetch",
+          "when": "view == gitNova.branches",
+          "group": "navigation@3"
+        },
+        {
+          "command": "gitNova.tags.create",
+          "when": "view == gitNova.tags",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitNova.refresh",
+          "when": "view == gitNova.tags",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitNova.refresh",
+          "when": "view == gitNova.commits",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitNova.openGitGraph",
+          "when": "view == gitNova.commits",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitNova.refresh",
+          "when": "view == gitNova.stashes",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitNova.stash.create",
+          "when": "view == gitNova.stashes",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitNova.refresh",
+          "when": "view == gitNova.remotes",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gitNova.stageFile",
+          "when": "view == gitNova.changes && viewItem == unstaged",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitNova.discardChanges",
+          "when": "view == gitNova.changes && viewItem == unstaged",
+          "group": "inline@2"
+        },
+        {
+          "command": "gitNova.unstageFile",
+          "when": "view == gitNova.changes && viewItem == staged",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitNova.stageFile",
+          "when": "view == gitNova.changes && viewItem == untracked",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitNova.discardChanges",
+          "when": "view == gitNova.changes && viewItem == untracked",
+          "group": "inline@2"
+        },
+        {
+          "command": "gitNova.openFileDiff",
+          "when": "view == gitNova.changes && (viewItem == staged || viewItem == unstaged || viewItem == untracked)",
+          "group": "1_navigation@1"
+        },
+        {
+          "command": "gitNova.openFile",
+          "when": "view == gitNova.changes && (viewItem == staged || viewItem == unstaged || viewItem == untracked)",
+          "group": "1_navigation@2"
+        },
+        {
+          "command": "gitNova.revealInExplorer",
+          "when": "view == gitNova.changes && (viewItem == staged || viewItem == unstaged || viewItem == untracked)",
+          "group": "2_files@1"
+        },
+        {
+          "command": "gitNova.copyPath",
+          "when": "view == gitNova.changes && (viewItem == staged || viewItem == unstaged || viewItem == untracked)",
+          "group": "2_files@2"
+        },
+        {
+          "command": "gitNova.copyRelativePath",
+          "when": "view == gitNova.changes && (viewItem == staged || viewItem == unstaged || viewItem == untracked)",
+          "group": "2_files@3"
+        },
+        {
+          "command": "gitNova.stageFile",
+          "when": "view == gitNova.changes && viewItem == unstaged",
+          "group": "3_staging@1"
+        },
+        {
+          "command": "gitNova.unstageFile",
+          "when": "view == gitNova.changes && viewItem == staged",
+          "group": "3_staging@1"
+        },
+        {
+          "command": "gitNova.discardChanges",
+          "when": "view == gitNova.changes && (viewItem == unstaged || viewItem == untracked)",
+          "group": "4_danger@1"
+        },
+        {
+          "command": "gitNova.branch.context.switch",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "inline"
+        },
+        {
+          "command": "gitNova.branch.context.create",
+          "when": "view == gitNova.branches",
+          "group": "1_branchActions@1"
+        },
+        {
+          "command": "gitNova.branch.context.delete",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "1_branchActions@2"
+        },
+        {
+          "command": "gitNova.branch.context.rename",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "1_branchActions@3"
+        },
+        {
+          "command": "gitNova.branch.context.merge",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "2_branchOperations@1"
+        },
+        {
+          "command": "gitNova.branch.context.compare",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "2_branchOperations@2"
+        },
+        {
+          "command": "gitNova.branch.context.push",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "3_sync@1"
+        },
+        {
+          "command": "gitNova.branch.context.pull",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "3_sync@2"
+        },
+        {
+          "command": "gitNova.branch.context.track",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "3_sync@3"
+        },
+        {
+          "command": "gitNova.branch.context.untrack",
+          "when": "view == gitNova.branches && viewItem == branch",
+          "group": "3_sync@4"
+        },
+        {
+          "command": "gitNova.tags.checkout",
+          "when": "view == gitNova.tags && viewItem == tag",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitNova.tags.delete",
+          "when": "view == gitNova.tags && viewItem == tag",
+          "group": "1_tagActions@1"
+        },
+        {
+          "command": "gitNova.tags.push",
+          "when": "view == gitNova.tags && viewItem == tag",
+          "group": "1_tagActions@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "GitNova",
+      "properties": {
+        "gitNova.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh git status"
+        },
+        "gitNova.refreshInterval": {
+          "type": "number",
+          "default": 60000,
+          "description": "Auto-refresh interval in milliseconds"
+        },
+        "gitNova.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show status bar items"
+        },
+        "gitNova.defaultBranchName": {
+          "type": "string",
+          "default": "main",
+          "description": "Default branch name"
+        },
+        "gitNova.showRemoteBranches": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show remote branches in tree view"
+        },
+        "gitNova.branchSortOrder": {
+          "type": "string",
+          "enum": [
+            "recent",
+            "name",
+            "date"
+          ],
+          "default": "recent",
+          "description": "Branch sort order"
+        },
+        "gitNova.commitMessageTemplate": {
+          "type": "string",
+          "default": "",
+          "description": "Commit message template"
+        },
+        "gitNova.showCommitGraph": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show commit graph visualization"
+        },
+        "gitNova.commitDisplayFormat": {
+          "type": "string",
+          "enum": [
+            "full",
+            "compact"
+          ],
+          "default": "full",
+          "description": "Commit display format"
+        },
+        "gitNova.diffViewMode": {
+          "type": "string",
+          "enum": [
+            "unified",
+            "side-by-side"
+          ],
+          "default": "unified",
+          "description": "Diff view mode"
+        },
+        "gitNova.ignoreWhitespace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ignore whitespace in diffs"
+        },
+        "gitNova.showLineNumbers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show line numbers in diffs"
+        },
+        "gitNova.autoStashBeforeRebase": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-stash changes before rebase"
+        },
+        "gitNova.includeUntrackedInStash": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include untracked files in stash"
+        },
+        "gitNova.autoFetch": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically fetch from remotes"
+        },
+        "gitNova.autoFetchInterval": {
+          "type": "number",
+          "default": 300000,
+          "description": "Auto-fetch interval in milliseconds"
+        },
+        "gitNova.autoPushAfterCommit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically push after commit"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.config.js",
+    "watch": "node esbuild.config.js --watch",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/vscode": "^1.107.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "@vscode/vsce": "^2.21.0",
+    "esbuild": "^0.19.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.2.0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "simple-git": "^3.19.0",
+    "zustand": "^4.4.0"
+  }
+}

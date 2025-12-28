@@ -1,0 +1,514 @@
+import * as vscode from 'vscode';
+import { GitService } from '../core/gitService';
+import { RepositoryManager } from '../core/repositoryManager';
+import { EventBus, EventType } from '../core/eventBus';
+import { FileStatus as ModelFileStatus } from '../models/commit';
+import { logger } from '../utils/logger';
+
+/**
+ * Tree item types
+ */
+enum TreeItemType {
+  StagedContainer = 'stagedContainer',
+  UnstagedContainer = 'unstagedContainer',
+  UntrackedContainer = 'untrackedContainer',
+  Staged = 'staged',
+  Unstaged = 'unstaged',
+  Untracked = 'untracked',
+}
+
+/**
+ * Base tree item for changes
+ */
+class ChangesTreeItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    public readonly type: TreeItemType,
+    collapsibleState: vscode.TreeItemCollapsibleState = vscode.TreeItemCollapsibleState.None
+  ) {
+    super(label, collapsibleState);
+    this.contextValue = type;
+  }
+}
+
+/**
+ * Container for staged files
+ */
+class StagedContainerItem extends ChangesTreeItem {
+  constructor(count: number) {
+    super(`Staged Changes`, TreeItemType.StagedContainer, vscode.TreeItemCollapsibleState.Expanded);
+    this.iconPath = new vscode.ThemeIcon('check', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
+    this.description = `${count} file${count !== 1 ? 's' : ''}`;
+    this.tooltip = `${count} file${count !== 1 ? 's' : ''} staged for commit`;
+  }
+}
+
+/**
+ * Container for unstaged files
+ */
+class UnstagedContainerItem extends ChangesTreeItem {
+  constructor(count: number) {
+    super(`Changes`, TreeItemType.UnstagedContainer, vscode.TreeItemCollapsibleState.Expanded);
+    this.iconPath = new vscode.ThemeIcon('edit', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
+    this.description = `${count} file${count !== 1 ? 's' : ''}`;
+    this.tooltip = `${count} modified file${count !== 1 ? 's' : ''}`;
+  }
+}
+
+/**
+ * Container for untracked files
+ */
+class UntrackedContainerItem extends ChangesTreeItem {
+  constructor(count: number) {
+    super(`Untracked`, TreeItemType.UntrackedContainer, vscode.TreeItemCollapsibleState.Collapsed);
+    this.iconPath = new vscode.ThemeIcon('question', new vscode.ThemeColor('gitDecoration.untrackedResourceForeground'));
+    this.description = `${count} file${count !== 1 ? 's' : ''}`;
+    this.tooltip = `${count} untracked file${count !== 1 ? 's' : ''}`;
+  }
+}
+
+/**
+ * File item representing a changed file
+ */
+class FileItem extends ChangesTreeItem {
+  constructor(
+    public readonly filePath: string,
+    public readonly absolutePath: string,
+    public readonly status: ModelFileStatus,
+    type: TreeItemType
+  ) {
+    const fileName = filePath.split('/').pop() || filePath;
+    super(fileName, type);
+    
+    this.description = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '';
+    this.tooltip = `${filePath}\nStatus: ${this.getStatusLabel(status)}\nClick to view diff`;
+    this.iconPath = this.getStatusIcon(status);
+    this.resourceUri = vscode.Uri.file(absolutePath);
+    
+    // Open diff view when clicked
+    this.command = {
+      command: 'gitNova.openFileDiff',
+      title: 'View Diff',
+      arguments: [this]
+    };
+  }
+
+  private getStatusIcon(status: ModelFileStatus): vscode.ThemeIcon {
+    switch (status) {
+      case ModelFileStatus.Modified:
+        return new vscode.ThemeIcon('diff-modified', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
+      case ModelFileStatus.Added:
+        return new vscode.ThemeIcon('diff-added', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
+      case ModelFileStatus.Deleted:
+        return new vscode.ThemeIcon('diff-removed', new vscode.ThemeColor('gitDecoration.deletedResourceForeground'));
+      case ModelFileStatus.Renamed:
+        return new vscode.ThemeIcon('diff-renamed', new vscode.ThemeColor('gitDecoration.renamedResourceForeground'));
+      case ModelFileStatus.Untracked:
+        return new vscode.ThemeIcon('file-add', new vscode.ThemeColor('gitDecoration.untrackedResourceForeground'));
+      default:
+        return new vscode.ThemeIcon('file');
+    }
+  }
+
+  private getStatusLabel(status: ModelFileStatus): string {
+    switch (status) {
+      case ModelFileStatus.Modified: return 'Modified';
+      case ModelFileStatus.Added: return 'Added';
+      case ModelFileStatus.Deleted: return 'Deleted';
+      case ModelFileStatus.Renamed: return 'Renamed';
+      case ModelFileStatus.Untracked: return 'Untracked';
+      default: return 'Unknown';
+    }
+  }
+}
+
+/**
+ * ChangesProvider - Shows staged, unstaged, and untracked file changes
+ */
+export class ChangesProvider implements vscode.TreeDataProvider<ChangesTreeItem> {
+  private _onDidChangeTreeData = new vscode.EventEmitter<ChangesTreeItem | undefined>();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  private disposables: vscode.Disposable[] = [];
+
+  constructor(
+    private gitService: GitService,
+    private repositoryManager: RepositoryManager,
+    private eventBus: EventBus
+  ) {
+    this.setupEventListeners();
+  }
+
+  refresh(): void {
+    logger.debug('ChangesProvider: Refreshing tree view');
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  getTreeItem(element: ChangesTreeItem): vscode.TreeItem {
+    return element;
+  }
+
+  async getChildren(element?: ChangesTreeItem): Promise<ChangesTreeItem[]> {
+    const repo = this.repositoryManager.getActiveRepository();
+    if (!repo) {
+      return [];
+    }
+
+    // If no element, return containers
+    if (!element) {
+      try {
+        const status = await this.gitService.getWorkingTreeStatus();
+        
+        const containers: ChangesTreeItem[] = [];
+        
+        if (status.staged && status.staged.length > 0) {
+          containers.push(new StagedContainerItem(status.staged.length));
+        }
+        
+        if (status.unstaged && status.unstaged.length > 0) {
+          containers.push(new UnstagedContainerItem(status.unstaged.length));
+        }
+        
+        if (status.untracked && status.untracked.length > 0) {
+          containers.push(new UntrackedContainerItem(status.untracked.length));
+        }
+
+        // Update context for welcome view
+        const hasNoChanges = containers.length === 0;
+        await vscode.commands.executeCommand('setContext', 'gitNova.noChanges', hasNoChanges);
+        
+        return containers;
+      } catch (error) {
+        logger.error('ChangesProvider: Error loading changes', error);
+        return [];
+      }
+    }
+
+    const repoPath = repo.path;
+
+    try {
+      const status = await this.gitService.getWorkingTreeStatus();
+
+      // Return files for each container
+      switch (element.type) {
+        case TreeItemType.StagedContainer:
+          return (status.staged || []).map(f => 
+            new FileItem(f.path, `${repoPath}/${f.path}`, f.indexStatus, TreeItemType.Staged)
+          );
+        
+        case TreeItemType.UnstagedContainer:
+          return (status.unstaged || []).map(f => 
+            new FileItem(f.path, `${repoPath}/${f.path}`, f.worktreeStatus, TreeItemType.Unstaged)
+          );
+        
+        case TreeItemType.UntrackedContainer:
+          return (status.untracked || []).map(f => 
+            new FileItem(f.path, `${repoPath}/${f.path}`, ModelFileStatus.Untracked, TreeItemType.Untracked)
+          );
+        
+        default:
+          return [];
+      }
+    } catch (error) {
+      logger.error('ChangesProvider: Error loading file items', error);
+      return [];
+    }
+  }
+
+  private setupEventListeners(): void {
+    this.disposables.push(
+      this.eventBus.on(EventType.CommitCreated, () => this.refresh())
+    );
+
+    this.disposables.push(
+      this.eventBus.on(EventType.RepositoryChanged, () => this.refresh())
+    );
+
+    this.disposables.push(
+      this.eventBus.on(EventType.StashCreated, () => this.refresh())
+    );
+
+    this.disposables.push(
+      this.eventBus.on(EventType.StashApplied, () => this.refresh())
+    );
+
+    // Watch for file system changes
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    this.disposables.push(watcher.onDidChange(() => this.refresh()));
+    this.disposables.push(watcher.onDidCreate(() => this.refresh()));
+    this.disposables.push(watcher.onDidDelete(() => this.refresh()));
+    this.disposables.push(watcher);
+  }
+
+  dispose(): void {
+    this.disposables.forEach(d => d.dispose());
+    this._onDidChangeTreeData.dispose();
+  }
+}
+
+/**
+ * Register changes tree view
+ */
+export function registerChangesProvider(
+  context: vscode.ExtensionContext,
+  gitService: GitService,
+  repositoryManager: RepositoryManager,
+  eventBus: EventBus
+): ChangesProvider {
+  const provider = new ChangesProvider(gitService, repositoryManager, eventBus);
+
+  const treeView = vscode.window.createTreeView('gitNova.changes', {
+    treeDataProvider: provider,
+    showCollapseAll: true,
+  });
+
+  // Debounced badge update to avoid blocking UI refresh
+  let badgeUpdateTimeout: NodeJS.Timeout | undefined;
+  const updateBadge = () => {
+    // Clear previous pending update
+    if (badgeUpdateTimeout) {
+      clearTimeout(badgeUpdateTimeout);
+    }
+    // Debounce badge update by 200ms to not block tree refresh
+    badgeUpdateTimeout = setTimeout(async () => {
+      try {
+        const repo = repositoryManager.getActiveRepository();
+        if (!repo) {
+          treeView.badge = undefined;
+          return;
+        }
+        const status = await gitService.getWorkingTreeStatus();
+        const totalChanges = (status.staged?.length || 0) + 
+                             (status.unstaged?.length || 0) + 
+                             (status.untracked?.length || 0);
+        if (totalChanges > 0) {
+          treeView.badge = {
+            value: totalChanges,
+            tooltip: `${totalChanges} pending change${totalChanges !== 1 ? 's' : ''}`
+          };
+        } else {
+          treeView.badge = undefined;
+        }
+      } catch {
+        treeView.badge = undefined;
+      }
+    }, 200);
+  };
+
+  // Update badge initially and on refresh
+  updateBadge();
+  
+  // Update badge when tree data changes (debounced)
+  provider.onDidChangeTreeData(() => updateBadge());
+
+  context.subscriptions.push(treeView);
+  context.subscriptions.push(provider);
+
+  // Register changes refresh command
+  const refreshCommand = vscode.commands.registerCommand(
+    'gitNova.changes.refresh',
+    () => {
+      logger.info('Refreshing changes view...');
+      provider.refresh();
+    }
+  );
+  context.subscriptions.push(refreshCommand);
+
+  // Register stage file command
+  const stageFileCommand = vscode.commands.registerCommand(
+    'gitNova.stageFile',
+    async (item: any) => {
+      // Get file path from item - try multiple properties
+      let filePath = item?.filePath;
+      if (!filePath && item?.resourceUri) {
+        filePath = item.resourceUri.fsPath;
+        const repoPath = repositoryManager.getActiveRepository()?.path;
+        if (repoPath && filePath.startsWith(repoPath)) {
+          filePath = filePath.substring(repoPath.length + 1);
+        }
+      }
+      
+      if (filePath) {
+        try {
+          // Run git add (fast operation)
+          await gitService.stageFiles([filePath]);
+          // Refresh immediately - no extra event emission to avoid duplicate refreshes
+          provider.refresh();
+        } catch (error) {
+          logger.error('Failed to stage file', error);
+          vscode.window.showErrorMessage(`Failed to stage: ${error}`);
+        }
+      }
+    }
+  );
+  context.subscriptions.push(stageFileCommand);
+
+  // Register unstage file command
+  const unstageFileCommand = vscode.commands.registerCommand(
+    'gitNova.unstageFile',
+    async (item: any) => {
+      // Get file path from item - try multiple properties
+      let filePath = item?.filePath;
+      if (!filePath && item?.resourceUri) {
+        filePath = item.resourceUri.fsPath;
+        const repoPath = repositoryManager.getActiveRepository()?.path;
+        if (repoPath && filePath.startsWith(repoPath)) {
+          filePath = filePath.substring(repoPath.length + 1);
+        }
+      }
+      
+      if (filePath) {
+        try {
+          // Run git reset (fast operation)
+          await gitService.unstageFiles([filePath]);
+          // Refresh immediately - no extra event emission to avoid duplicate refreshes
+          provider.refresh();
+        } catch (error) {
+          logger.error('Failed to unstage file', error);
+          vscode.window.showErrorMessage(`Failed to unstage: ${error}`);
+        }
+      }
+    }
+  );
+  context.subscriptions.push(unstageFileCommand);
+
+  // Register stage all command
+  const stageAllCommand = vscode.commands.registerCommand(
+    'gitNova.stageAll',
+    async () => {
+      logger.info('Staging all files');
+      try {
+        await gitService.stageFiles(['.']);
+        provider.refresh();
+        eventBus.emit(EventType.RepositoryChanged, { type: 'staged' });
+        vscode.window.showInformationMessage('All changes staged');
+      } catch (error) {
+        logger.error('Failed to stage all files', error);
+        vscode.window.showErrorMessage(`Failed to stage all: ${error}`);
+      }
+    }
+  );
+  context.subscriptions.push(stageAllCommand);
+
+  // Register unstage all command
+  const unstageAllCommand = vscode.commands.registerCommand(
+    'gitNova.unstageAll',
+    async () => {
+      logger.info('Unstaging all files');
+      try {
+        await gitService.unstageFiles(['.']);
+        provider.refresh();
+        eventBus.emit(EventType.RepositoryChanged, { type: 'unstaged' });
+        vscode.window.showInformationMessage('All changes unstaged');
+      } catch (error) {
+        logger.error('Failed to unstage all files', error);
+        vscode.window.showErrorMessage(`Failed to unstage all: ${error}`);
+      }
+    }
+  );
+  context.subscriptions.push(unstageAllCommand);
+
+  // Register discard changes command
+  const discardChangesCommand = vscode.commands.registerCommand(
+    'gitNova.discardChanges',
+    async (item: any) => {
+      if (item && item.filePath) {
+        const confirm = await vscode.window.showWarningMessage(
+          `Discard changes to ${item.filePath}? This cannot be undone.`,
+          { modal: true },
+          'Discard'
+        );
+        if (confirm === 'Discard') {
+          logger.info(`Discarding changes: ${item.filePath}`);
+          try {
+            await gitService.discardChanges([item.filePath]);
+            provider.refresh();
+          } catch (error) {
+            logger.error('Failed to discard changes', error);
+            vscode.window.showErrorMessage(`Failed to discard changes: ${error}`);
+          }
+        }
+      }
+    }
+  );
+  context.subscriptions.push(discardChangesCommand);
+
+  // Register open file diff command (shows diff view when clicking a file)
+  const openFileDiffCommand = vscode.commands.registerCommand(
+    'gitNova.openFileDiff',
+    async (item: any) => {
+      if (!item || !item.absolutePath) return;
+      
+      const fileUri = vscode.Uri.file(item.absolutePath);
+      const fileName = item.filePath.split('/').pop() || item.filePath;
+      
+      try {
+        // Try to use VS Code's built-in Git extension to open the diff
+        // First try the git.openChange command which handles diffs properly
+        await vscode.commands.executeCommand('git.openChange', fileUri);
+      } catch (error1) {
+        // If git.openChange fails, try vscode.git.openDiff
+        try {
+          await vscode.commands.executeCommand('vscode.open', fileUri, {
+            preview: true,
+            preserveFocus: false
+          });
+        } catch (error2) {
+          // Final fallback: just open the file
+          logger.error('Failed to open diff, falling back to file open', error2);
+          await vscode.commands.executeCommand('vscode.open', fileUri);
+        }
+      }
+    }
+  );
+  context.subscriptions.push(openFileDiffCommand);
+
+  // Open file in editor command
+  const openFileCommand = vscode.commands.registerCommand(
+    'gitNova.openFile',
+    async (item: any) => {
+      if (item && item.absolutePath) {
+        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(item.absolutePath));
+      }
+    }
+  );
+  context.subscriptions.push(openFileCommand);
+
+  // Reveal file in explorer command
+  const revealInExplorerCommand = vscode.commands.registerCommand(
+    'gitNova.revealInExplorer',
+    async (item: any) => {
+      if (item && item.absolutePath) {
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(item.absolutePath));
+      }
+    }
+  );
+  context.subscriptions.push(revealInExplorerCommand);
+
+  // Copy file path command
+  const copyPathCommand = vscode.commands.registerCommand(
+    'gitNova.copyPath',
+    async (item: any) => {
+      if (item && item.absolutePath) {
+        await vscode.env.clipboard.writeText(item.absolutePath);
+        vscode.window.showInformationMessage('Path copied to clipboard');
+      }
+    }
+  );
+  context.subscriptions.push(copyPathCommand);
+
+  // Copy relative path command
+  const copyRelativePathCommand = vscode.commands.registerCommand(
+    'gitNova.copyRelativePath',
+    async (item: any) => {
+      if (item && item.filePath) {
+        await vscode.env.clipboard.writeText(item.filePath);
+        vscode.window.showInformationMessage('Relative path copied to clipboard');
+      }
+    }
+  );
+  context.subscriptions.push(copyRelativePathCommand);
+
+  logger.info('ChangesProvider registered');
+  return provider;
+}

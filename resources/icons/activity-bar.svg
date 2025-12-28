@@ -1,0 +1,9 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Pulse Line -->
+  <path d="M2 12H5L8 5L11 19L14 12H16C19 12 19 9 20 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Branch Line -->
+  <path d="M16 12C19 12 19 15 20 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Nodes -->
+  <circle cx="20" cy="8" r="1.5" fill="currentColor"/>
+  <circle cx="20" cy="16" r="1.5" fill="currentColor"/>
+</svg>
