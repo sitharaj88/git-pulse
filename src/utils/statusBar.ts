@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { RepositoryManager } from '../core/repositoryManager';
-import { EventBus } from '../core/eventBus';
+import { EventBus, EventType } from '../core/eventBus';
 
 /**
  * Register status bar items
@@ -36,5 +36,34 @@ export function registerStatusBarItems(
   syncStatusBarItem.show();
   context.subscriptions.push(syncStatusBarItem);
 
-  console.log('Status bar items registered');
+  const updateFromRepository = (): void => {
+    const repo = repositoryManager.getActiveRepository();
+
+    if (!repo) {
+      branchStatusBarItem.text = '$(git-branch) No repo';
+      statusStatusBarItem.text = '$(dash) No repository';
+      return;
+    }
+
+    const branchName = repo.currentBranch?.name || 'detached';
+    branchStatusBarItem.text = `$(git-branch) ${branchName}`;
+
+    const hasChanges = (repo.status?.files?.length || 0) > 0;
+    statusStatusBarItem.text = hasChanges ? '$(alert) Changes' : '$(check) Clean';
+  };
+
+  // Initial paint
+  updateFromRepository();
+
+  // Update on branch and repository changes
+  const disposables = [
+    eventBus.on(EventType.RepositoryDetected, updateFromRepository),
+    eventBus.on(EventType.RepositoryChanged, updateFromRepository),
+    eventBus.on(EventType.BranchSwitched, (data: { branchName: string }) => {
+      branchStatusBarItem.text = `$(git-branch) ${data.branchName}`;
+      updateFromRepository();
+    }),
+  ];
+
+  context.subscriptions.push(...disposables);
 }

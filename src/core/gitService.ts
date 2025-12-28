@@ -958,7 +958,8 @@ export class GitService {
   async unstageFiles(files: string[]): Promise<void> {
     logger.debug(`Unstaging ${files.length} files`);
     try {
-      await this.git.reset(files);
+      // Use mixed reset with explicit paths to avoid unstaging everything by accident
+      await this.git.raw(['reset', 'HEAD', '--', ...files]);
       logger.debug('Files unstaged successfully');
     } catch (error) {
       logger.error('Failed to unstage files', error);
@@ -973,7 +974,32 @@ export class GitService {
   async discardChanges(files: string[]): Promise<void> {
     logger.debug(`Discarding changes for ${files.length} files`);
     try {
-      await this.git.checkout(files);
+      const status = await this.getWorkingTreeStatus();
+
+      const tracked: string[] = [];
+      const untracked: string[] = [];
+
+      for (const file of files) {
+        const entry = status.files.find(f => f.path === file);
+        if (entry && entry.worktreeStatus === FileStatus.Untracked) {
+          untracked.push(file);
+        } else if (entry && entry.indexStatus === FileStatus.Untracked) {
+          untracked.push(file);
+        } else {
+          tracked.push(file);
+        }
+      }
+
+      if (tracked.length > 0) {
+        // Use explicit path separator to avoid ambiguity with branch names
+        await this.git.raw(['checkout', '--', ...tracked]);
+      }
+
+      if (untracked.length > 0) {
+        // Remove untracked files
+        await this.git.raw(['clean', '-f', '--', ...untracked]);
+      }
+
       logger.debug('Changes discarded successfully');
     } catch (error) {
       logger.error('Failed to discard changes', error);

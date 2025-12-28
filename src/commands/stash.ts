@@ -3,6 +3,7 @@ import { GitService } from '../core/gitService';
 import { RepositoryManager } from '../core/repositoryManager';
 import { EventBus, EventType } from '../core/eventBus';
 import { StashCommands } from '../constants/commands';
+import { Stash } from '../models/stash';
 import { logger } from '../utils/logger';
 
 /**
@@ -36,6 +37,64 @@ async function executeWithProgress<T>(
     },
     operation
   );
+}
+
+function invalidateStashCache(repositoryManager: RepositoryManager): void {
+  repositoryManager.invalidateCache('stashes');
+}
+
+async function resolveStashSelection(
+  gitService: GitService,
+  target?: number | Stash | { ref?: string }
+): Promise<{ stash: Stash; index: number } | null> {
+  const stashes = await gitService.getStashes();
+
+  const findByIndex = (index: number): { stash: Stash; index: number } | null => {
+    const ref = `stash@{${index}}`;
+    const stash = stashes.find(s => s.ref === ref);
+    return stash ? { stash, index } : null;
+  };
+
+  if (typeof target === 'number') {
+    const match = findByIndex(target);
+    if (match) {
+      return match;
+    }
+  }
+
+  if (target && typeof target === 'object' && 'ref' in target && target.ref) {
+    const indexMatch = target.ref.match(/\{(\d+)\}/);
+    if (indexMatch) {
+      const idx = parseInt(indexMatch[1], 10);
+      const match = findByIndex(idx);
+      if (match) {
+        return match;
+      }
+    }
+  }
+
+  if (stashes.length === 0) {
+    showInfoNotification('No stashes available');
+    return null;
+  }
+
+  const picked = await vscode.window.showQuickPick(
+    stashes.map(s => ({
+      label: `${s.ref}: ${s.message}`,
+      description: `${s.branch} - ${s.date.toLocaleDateString()}`,
+      stash: s,
+    })),
+    {
+      placeHolder: 'Select stash',
+    }
+  );
+
+  if (!picked) {
+    return null;
+  }
+
+  const index = parseInt(picked.stash.ref.match(/\{(\d+)\}/)?.[1] || '0', 10);
+  return { stash: picked.stash, index };
 }
 
 /**
@@ -81,6 +140,8 @@ export function registerStashCommands(
         // Emit event
         eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
 
+        invalidateStashCache(repositoryManager);
+
         // Refresh repository state
         await repositoryManager.refreshCache();
       });
@@ -108,38 +169,23 @@ export function registerStashCommands(
   context.subscriptions.push(listStashesCommand);
 
   // ==================== Apply Stash ====================
-  const applyStashCommand = vscode.commands.registerCommand(StashCommands.Apply, async () => {
+  const applyStashCommand = vscode.commands.registerCommand(StashCommands.Apply, async target => {
     try {
-      const stashes = await gitService.getStashes();
-
-      if (stashes.length === 0) {
-        showInfoNotification('No stashes available');
-        return;
-      }
-
-      const selected = await vscode.window.showQuickPick(
-        stashes.map(s => ({
-          label: `${s.ref}: ${s.message}`,
-          description: `${s.branch} - ${s.date.toLocaleDateString()}`,
-          stash: s,
-        })),
-        {
-          placeHolder: 'Select stash to apply',
-        }
-      );
-
-      if (!selected) {
+      const selection = await resolveStashSelection(gitService, target);
+      if (!selection) {
         return;
       }
 
       await executeWithProgress('Applying stash...', async progress => {
-        progress.report({ message: `Applying ${selected.stash.ref}...` });
-        await gitService.applyStash(parseInt(selected.stash.ref.match(/\{(\d+)\}/)?.[1] || '0'));
-        logger.info(`Stash applied: ${selected.stash.ref}`);
-        showInfoNotification(`Stash ${selected.stash.ref} applied successfully`);
+        progress.report({ message: `Applying ${selection.stash.ref}...` });
+        await gitService.applyStash(selection.index);
+        logger.info(`Stash applied: ${selection.stash.ref}`);
+        showInfoNotification(`Stash ${selection.stash.ref} applied successfully`);
 
         // Emit event
         eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
+
+        invalidateStashCache(repositoryManager);
 
         // Refresh repository state
         await repositoryManager.refreshCache();
@@ -152,38 +198,23 @@ export function registerStashCommands(
   context.subscriptions.push(applyStashCommand);
 
   // ==================== Pop Stash ====================
-  const popStashCommand = vscode.commands.registerCommand(StashCommands.Pop, async () => {
+  const popStashCommand = vscode.commands.registerCommand(StashCommands.Pop, async target => {
     try {
-      const stashes = await gitService.getStashes();
-
-      if (stashes.length === 0) {
-        showInfoNotification('No stashes available');
-        return;
-      }
-
-      const selected = await vscode.window.showQuickPick(
-        stashes.map(s => ({
-          label: `${s.ref}: ${s.message}`,
-          description: `${s.branch} - ${s.date.toLocaleDateString()}`,
-          stash: s,
-        })),
-        {
-          placeHolder: 'Select stash to pop',
-        }
-      );
-
-      if (!selected) {
+      const selection = await resolveStashSelection(gitService, target);
+      if (!selection) {
         return;
       }
 
       await executeWithProgress('Popping stash...', async progress => {
-        progress.report({ message: `Popping ${selected.stash.ref}...` });
-        await gitService.popStash(parseInt(selected.stash.ref.match(/\{(\d+)\}/)?.[1] || '0'));
-        logger.info(`Stash popped: ${selected.stash.ref}`);
-        showInfoNotification(`Stash ${selected.stash.ref} popped successfully`);
+        progress.report({ message: `Popping ${selection.stash.ref}...` });
+        await gitService.popStash(selection.index);
+        logger.info(`Stash popped: ${selection.stash.ref}`);
+        showInfoNotification(`Stash ${selection.stash.ref} popped successfully`);
 
         // Emit event
         eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
+
+        invalidateStashCache(repositoryManager);
 
         // Refresh repository state
         await repositoryManager.refreshCache();
@@ -196,32 +227,15 @@ export function registerStashCommands(
   context.subscriptions.push(popStashCommand);
 
   // ==================== Drop Stash ====================
-  const dropStashCommand = vscode.commands.registerCommand(StashCommands.Drop, async () => {
+  const dropStashCommand = vscode.commands.registerCommand(StashCommands.Drop, async target => {
     try {
-      const stashes = await gitService.getStashes();
-
-      if (stashes.length === 0) {
-        showInfoNotification('No stashes available');
-        return;
-      }
-
-      const selected = await vscode.window.showQuickPick(
-        stashes.map(s => ({
-          label: `${s.ref}: ${s.message}`,
-          description: `${s.branch} - ${s.date.toLocaleDateString()}`,
-          stash: s,
-        })),
-        {
-          placeHolder: 'Select stash to drop',
-        }
-      );
-
-      if (!selected) {
+      const selection = await resolveStashSelection(gitService, target);
+      if (!selection) {
         return;
       }
 
       const confirm = await vscode.window.showWarningMessage(
-        `Are you sure you want to drop stash ${selected.stash.ref}?`,
+        `Are you sure you want to drop stash ${selection.stash.ref}?`,
         'Drop',
         'Cancel'
       );
@@ -231,13 +245,15 @@ export function registerStashCommands(
       }
 
       await executeWithProgress('Dropping stash...', async progress => {
-        progress.report({ message: `Dropping ${selected.stash.ref}...` });
-        await gitService.dropStash(parseInt(selected.stash.ref.match(/\{(\d+)\}/)?.[1] || '0'));
-        logger.info(`Stash dropped: ${selected.stash.ref}`);
-        showInfoNotification(`Stash ${selected.stash.ref} dropped successfully`);
+        progress.report({ message: `Dropping ${selection.stash.ref}...` });
+        await gitService.dropStash(selection.index);
+        logger.info(`Stash dropped: ${selection.stash.ref}`);
+        showInfoNotification(`Stash ${selection.stash.ref} dropped successfully`);
 
         // Emit event
         eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
+
+        invalidateStashCache(repositoryManager);
 
         // Refresh repository state
         await repositoryManager.refreshCache();
@@ -277,6 +293,8 @@ export function registerStashCommands(
 
         // Emit event
         eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
+
+        invalidateStashCache(repositoryManager);
 
         // Refresh repository state
         await repositoryManager.refreshCache();

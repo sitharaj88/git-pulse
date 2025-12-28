@@ -45,7 +45,8 @@ export namespace DiffCommands {
   export const ViewUnstaged = 'gitNova.diff.viewUnstaged';
   export const CompareCommits = 'gitNova.diff.compareCommits';
   export const CompareBranches = 'gitNova.diff.compareBranches';
-  export const DiscardChanges = 'gitNova.diff.discardChanges';
+  export const DiscardChanges = 'gitNova.discardChanges';
+  export const DiscardAllChanges = 'gitNova.discardAllChanges';
   export const StageFile = 'gitNova.diff.stageFile';
   export const UnstageFile = 'gitNova.diff.unstageFile';
 }

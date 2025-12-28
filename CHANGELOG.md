@@ -2,6 +2,12 @@
 
 All notable changes to the "GitNova" extension will be documented in this file.
 
+## [1.0.4] - 2025-12-28
+- Enhanced Diff view handling and performance.
+- Improved Stash management reliability.
+- Optimized Status Bar updates and git service interactions.
+- General codebase refactoring and stability improvements.
+
 ## [1.0.3] - 2025-12-28
 - Faster stage/unstage updates in CHANGES via optimistic status cache and debounced refreshes.
 - Discard fixes: handle untracked files, add discard-all action, and refresh status immediately.

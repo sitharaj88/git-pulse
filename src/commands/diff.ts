@@ -205,7 +205,7 @@ export function registerDiffCommands(
   // ==================== Discard Changes ====================
   const discardChangesCommand = vscode.commands.registerCommand(
     DiffCommands.DiscardChanges,
-    async (filePath?: string) => {
+    async (target?: string | { filePath?: string; path?: string }) => {
       try {
         const status = await gitService.getWorkingTreeStatus();
         const files = status.unstaged.concat(status.conflicted);
@@ -215,8 +215,16 @@ export function registerDiffCommands(
           return;
         }
 
+        let resolvedPath: string | undefined;
+
+        if (typeof target === 'string') {
+          resolvedPath = target;
+        } else if (target && typeof target === 'object') {
+          resolvedPath = (target as any).filePath || (target as any).path;
+        }
+
         const fileToDiscard =
-          filePath ||
+          resolvedPath ||
           (
             await vscode.window.showQuickPick(
               files.map(f => ({
@@ -249,6 +257,7 @@ export function registerDiffCommands(
           await gitService.discardChanges([fileToDiscard]);
           showInfoNotification(`Changes to ${fileToDiscard} discarded`);
           eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
+          await repositoryManager.refreshCache('status');
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -257,6 +266,44 @@ export function registerDiffCommands(
     }
   );
   context.subscriptions.push(discardChangesCommand);
+
+  // ==================== Discard All Changes ====================
+  const discardAllChangesCommand = vscode.commands.registerCommand(
+    DiffCommands.DiscardAllChanges,
+    async () => {
+      try {
+        const status = await gitService.getWorkingTreeStatus();
+        const files = status.unstaged.concat(status.untracked).concat(status.conflicted);
+
+        if (files.length === 0) {
+          showInfoNotification('No changes to discard');
+          return;
+        }
+
+        const confirm = await vscode.window.showWarningMessage(
+          `Discard ALL ${files.length} change${files.length !== 1 ? 's' : ''}? This cannot be undone.`,
+          { modal: true },
+          'Discard All'
+        );
+
+        if (confirm !== 'Discard All') {
+          return;
+        }
+
+        await executeWithProgress('Discarding all changes...', async progress => {
+          progress.report({ message: 'Discarding all changes...' });
+          await gitService.discardChanges(files.map(f => f.path));
+          showInfoNotification('All changes discarded');
+          eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
+          await repositoryManager.refreshCache('status');
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showErrorNotification(`Failed to discard all changes: ${errorMessage}`);
+      }
+    }
+  );
+  context.subscriptions.push(discardAllChangesCommand);
 
   // ==================== Stage File ====================
   const stageFileCommand = vscode.commands.registerCommand(

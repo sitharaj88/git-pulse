@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { GitService } from '../core/gitService';
 import { RepositoryManager } from '../core/repositoryManager';
 import { EventBus, EventType } from '../core/eventBus';
+import { GitStatus } from '../models';
 import { FileStatus as ModelFileStatus } from '../models/commit';
 import { logger } from '../utils/logger';
 
@@ -130,6 +131,12 @@ export class ChangesProvider implements vscode.TreeDataProvider<ChangesTreeItem>
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private disposables: vscode.Disposable[] = [];
+  private statusCache: GitStatus | null = null;
+  private statusCacheExpiry = 0;
+  private statusInFlight: Promise<GitStatus> | null = null;
+  private readonly STATUS_CACHE_TTL_MS = 500;
+  private refreshTimer: NodeJS.Timeout | null = null;
+  private readonly REFRESH_DEBOUNCE_MS = 150;
 
   constructor(
     private gitService: GitService,
@@ -140,8 +147,72 @@ export class ChangesProvider implements vscode.TreeDataProvider<ChangesTreeItem>
   }
 
   refresh(): void {
+    this.invalidateStatusCache();
     logger.debug('ChangesProvider: Refreshing tree view');
     this._onDidChangeTreeData.fire(undefined);
+  }
+
+  private setStatusCache(status: GitStatus): void {
+    this.statusCache = status;
+    this.statusCacheExpiry = Date.now() + this.STATUS_CACHE_TTL_MS;
+  }
+
+  private updateStatusCacheAfterStage(filePath: string): void {
+    if (!this.statusCache) {
+      return;
+    }
+
+    const status = { ...this.statusCache } as GitStatus;
+    status.unstaged = status.unstaged.filter(f => f.path !== filePath);
+    status.untracked = status.untracked.filter(f => f.path !== filePath);
+
+    const file = status.files.find(f => f.path === filePath);
+    if (file) {
+      file.indexStatus = ModelFileStatus.Modified;
+      file.worktreeStatus = file.worktreeStatus || ModelFileStatus.Modified;
+      // Move to staged if not already
+      if (!status.staged.find(f => f.path === filePath)) {
+        status.staged = status.staged.concat({ ...file });
+      }
+    }
+
+    this.setStatusCache(status);
+  }
+
+  private updateStatusCacheAfterUnstage(filePath: string): void {
+    if (!this.statusCache) {
+      return;
+    }
+
+    const status = { ...this.statusCache } as GitStatus;
+    status.staged = status.staged.filter(f => f.path !== filePath);
+
+    const file = status.files.find(f => f.path === filePath);
+    if (file) {
+      file.indexStatus = ModelFileStatus.Unmodified;
+      if (!status.unstaged.find(f => f.path === filePath)) {
+        status.unstaged = status.unstaged.concat({ ...file });
+      }
+    }
+
+    this.setStatusCache(status);
+  }
+
+  private scheduleRefresh(): void {
+    if (this.refreshTimer) {
+      return;
+    }
+
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      this.refresh();
+    }, this.REFRESH_DEBOUNCE_MS);
+  }
+
+  invalidateStatusCache(): void {
+    this.statusCache = null;
+    this.statusCacheExpiry = 0;
+    this.statusInFlight = null;
   }
 
   getTreeItem(element: ChangesTreeItem): vscode.TreeItem {
@@ -157,7 +228,7 @@ export class ChangesProvider implements vscode.TreeDataProvider<ChangesTreeItem>
     // If no element, return containers
     if (!element) {
       try {
-        const status = await this.gitService.getWorkingTreeStatus();
+        const status = await this.getStatus();
         
         const containers: ChangesTreeItem[] = [];
         
@@ -187,7 +258,7 @@ export class ChangesProvider implements vscode.TreeDataProvider<ChangesTreeItem>
     const repoPath = repo.path;
 
     try {
-      const status = await this.gitService.getWorkingTreeStatus();
+      const status = await this.getStatus();
 
       // Return files for each container
       switch (element.type) {
@@ -217,27 +288,51 @@ export class ChangesProvider implements vscode.TreeDataProvider<ChangesTreeItem>
 
   private setupEventListeners(): void {
     this.disposables.push(
-      this.eventBus.on(EventType.CommitCreated, () => this.refresh())
+      this.eventBus.on(EventType.CommitCreated, () => this.scheduleRefresh())
     );
 
     this.disposables.push(
-      this.eventBus.on(EventType.RepositoryChanged, () => this.refresh())
+      this.eventBus.on(EventType.RepositoryChanged, () => this.scheduleRefresh())
     );
 
     this.disposables.push(
-      this.eventBus.on(EventType.StashCreated, () => this.refresh())
+      this.eventBus.on(EventType.StashCreated, () => this.scheduleRefresh())
     );
 
     this.disposables.push(
-      this.eventBus.on(EventType.StashApplied, () => this.refresh())
+      this.eventBus.on(EventType.StashApplied, () => this.scheduleRefresh())
     );
 
     // Watch for file system changes
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-    this.disposables.push(watcher.onDidChange(() => this.refresh()));
-    this.disposables.push(watcher.onDidCreate(() => this.refresh()));
-    this.disposables.push(watcher.onDidDelete(() => this.refresh()));
+    this.disposables.push(watcher.onDidChange(() => this.scheduleRefresh()));
+    this.disposables.push(watcher.onDidCreate(() => this.scheduleRefresh()));
+    this.disposables.push(watcher.onDidDelete(() => this.scheduleRefresh()));
     this.disposables.push(watcher);
+  }
+
+  private async getStatus(): Promise<GitStatus> {
+    const now = Date.now();
+
+    if (this.statusCache && now < this.statusCacheExpiry) {
+      return this.statusCache;
+    }
+
+    if (this.statusInFlight) {
+      return this.statusInFlight;
+    }
+
+    this.statusInFlight = (async () => {
+      try {
+        const status = await this.gitService.getWorkingTreeStatus();
+        this.setStatusCache(status);
+        return status;
+      } finally {
+        this.statusInFlight = null;
+      }
+    })();
+
+    return this.statusInFlight;
   }
 
   dispose(): void {
@@ -332,8 +427,9 @@ export function registerChangesProvider(
         try {
           // Run git add (fast operation)
           await gitService.stageFiles([filePath]);
-          // Refresh immediately - no extra event emission to avoid duplicate refreshes
+          provider.updateStatusCacheAfterStage(filePath);
           provider.refresh();
+          eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
         } catch (error) {
           logger.error('Failed to stage file', error);
           vscode.window.showErrorMessage(`Failed to stage: ${error}`);
@@ -361,8 +457,9 @@ export function registerChangesProvider(
         try {
           // Run git reset (fast operation)
           await gitService.unstageFiles([filePath]);
-          // Refresh immediately - no extra event emission to avoid duplicate refreshes
+          provider.updateStatusCacheAfterUnstage(filePath);
           provider.refresh();
+          eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
         } catch (error) {
           logger.error('Failed to unstage file', error);
           vscode.window.showErrorMessage(`Failed to unstage: ${error}`);
@@ -379,8 +476,9 @@ export function registerChangesProvider(
       logger.info('Staging all files');
       try {
         await gitService.stageFiles(['.']);
+        provider.invalidateStatusCache();
         provider.refresh();
-        eventBus.emit(EventType.RepositoryChanged, { type: 'staged' });
+        eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
         vscode.window.showInformationMessage('All changes staged');
       } catch (error) {
         logger.error('Failed to stage all files', error);
@@ -397,8 +495,9 @@ export function registerChangesProvider(
       logger.info('Unstaging all files');
       try {
         await gitService.unstageFiles(['.']);
+        provider.invalidateStatusCache();
         provider.refresh();
-        eventBus.emit(EventType.RepositoryChanged, { type: 'unstaged' });
+        eventBus.emit(EventType.RepositoryChanged, repositoryManager.getActiveRepository());
         vscode.window.showInformationMessage('All changes unstaged');
       } catch (error) {
         logger.error('Failed to unstage all files', error);
@@ -407,31 +506,6 @@ export function registerChangesProvider(
     }
   );
   context.subscriptions.push(unstageAllCommand);
-
-  // Register discard changes command
-  const discardChangesCommand = vscode.commands.registerCommand(
-    'gitNova.discardChanges',
-    async (item: any) => {
-      if (item && item.filePath) {
-        const confirm = await vscode.window.showWarningMessage(
-          `Discard changes to ${item.filePath}? This cannot be undone.`,
-          { modal: true },
-          'Discard'
-        );
-        if (confirm === 'Discard') {
-          logger.info(`Discarding changes: ${item.filePath}`);
-          try {
-            await gitService.discardChanges([item.filePath]);
-            provider.refresh();
-          } catch (error) {
-            logger.error('Failed to discard changes', error);
-            vscode.window.showErrorMessage(`Failed to discard changes: ${error}`);
-          }
-        }
-      }
-    }
-  );
-  context.subscriptions.push(discardChangesCommand);
 
   // Register open file diff command (shows diff view when clicking a file)
   const openFileDiffCommand = vscode.commands.registerCommand(

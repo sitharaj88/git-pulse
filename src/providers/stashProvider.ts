@@ -109,7 +109,10 @@ export class StashProvider implements vscode.TreeDataProvider<StashTreeItem> {
    */
   async getChildren(element?: StashTreeItem): Promise<StashTreeItem[]> {
     if (!element) {
-      // Root level - show stashes
+      return [new RootItem()];
+    }
+
+    if (element.type === TreeItemType.Root) {
       return await this.getStashItems();
     }
 
